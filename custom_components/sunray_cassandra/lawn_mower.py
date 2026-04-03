@@ -168,7 +168,8 @@ class SunrayCassandraLawnMower(LawnMowerEntity):
 
         Decision order:
         1. If the mower is already mid-task (mowing/transit), resume it.
-        2. If a specific task is chosen in the Task select entity, run that task.
+        2. If a specific task is chosen in the Task select entity, select it
+           on CaSSAndRA first, then send mow with value ["task"].
         3. Otherwise mow all area.
         """
         current_status = self._coordinator.robot.get("status", "")
@@ -177,15 +178,25 @@ class SunrayCassandraLawnMower(LawnMowerEntity):
         if current_status not in (
             ROBOT_STATUS_IDLE, ROBOT_STATUS_DOCKED, ROBOT_STATUS_CHARGING
         ):
-            value = ["resume"]
-        else:
-            # Look up the companion task select entity for this device
-            task_value = self._get_selected_task_value()
-            value = [task_value]
+            await self._coordinator.async_publish_command(
+                {"robot": {"command": "mow", "value": ["resume"]}}
+            )
+            return
 
-        await self._coordinator.async_publish_command(
-            {"robot": {"command": "mow", "value": value}}
-        )
+        task_name = self._get_selected_task_value()
+        if task_name != "all":
+            # Step 1: tell CaSSAndRA which task to use
+            await self._coordinator.async_publish_command(
+                {"tasks": {"command": "select", "value": [task_name]}}
+            )
+            # Step 2: start mowing that task (CaSSAndRA reads its own selection)
+            await self._coordinator.async_publish_command(
+                {"robot": {"command": "mow", "value": ["task"]}}
+            )
+        else:
+            await self._coordinator.async_publish_command(
+                {"robot": {"command": "mow", "value": ["all"]}}
+            )
 
     def _get_selected_task_value(self) -> str:
         """Return the task value from the companion select entity, or 'all'."""
