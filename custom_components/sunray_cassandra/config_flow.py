@@ -24,8 +24,6 @@ from .const import (
     CONF_MQTT_PASSWORD,
     CONF_MQTT_PORT,
     CONF_MQTT_USERNAME,
-    CONF_ORIGIN_LAT,
-    CONF_ORIGIN_LON,
     CONF_SERVER_NAME,
     CONF_USE_HA_MQTT,
     DEFAULT_CASSANDRA_PORT,
@@ -186,27 +184,5 @@ class SunrayCassandraOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(step_id="init", data_schema=schema)
 
 
-async def async_migrate_entry(
-    hass: HomeAssistant, config_entry: config_entries.ConfigEntry
-) -> bool:
-    """Migrate old config entry to the current version.
 
-    v1 → v2: add origin_lat / origin_lon fields (defaulting to 0.0).
-              The coordinator will overwrite these with the real values from
-              CaSSAndRA's settings MQTT response after the entry is loaded.
-    """
-    _LOGGER.debug(
-        "Migrating %s config entry from version %s to version 2",
-        DOMAIN,
-        config_entry.version,
-    )
-    if config_entry.version == 1:
-        new_data = {**config_entry.data}
-        new_data.setdefault(CONF_ORIGIN_LAT, 0.0)
-        new_data.setdefault(CONF_ORIGIN_LON, 0.0)
-        hass.config_entries.async_update_entry(
-            config_entry, data=new_data, version=2
-        )
-        _LOGGER.info("Migration of %s config entry to version 2 successful", DOMAIN)
-    return True
 

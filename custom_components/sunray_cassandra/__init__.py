@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 
-from .const import DATA_COORDINATOR, DOMAIN
+from .const import CONF_ORIGIN_LAT, CONF_ORIGIN_LON, DATA_COORDINATOR, DOMAIN
 from .coordinator import SunrayCassandraCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,6 +66,27 @@ def _get_coordinator_for_call(hass: HomeAssistant, call: ServiceCall) -> SunrayC
         "Target a lawn_mower entity when multiple CaSSAndRA instances exist."
     )
     return None
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old config entry to the current version.
+
+    v1 → v2: add origin_lat / origin_lon (defaulting to 0.0).
+              The coordinator will overwrite these with real values from the
+              CaSSAndRA settings MQTT response after the entry is loaded.
+    """
+    _LOGGER.debug(
+        "Migrating %s config entry from version %s to version 2",
+        DOMAIN,
+        entry.version,
+    )
+    if entry.version == 1:
+        new_data = {**entry.data}
+        new_data.setdefault(CONF_ORIGIN_LAT, 0.0)
+        new_data.setdefault(CONF_ORIGIN_LON, 0.0)
+        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
+        _LOGGER.info("Migration of %s config entry to version 2 successful", DOMAIN)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
