@@ -270,7 +270,17 @@ class SunrayCassandraCoordinator:
 
     def _handle_robot_raw(self, payload: str | bytes) -> None:
         self._last_mqtt_message = datetime.utcnow()
-        self.data["robot"] = self._parse_json(payload, "robot")
+        robot = self._parse_json(payload, "robot")
+        # CaSSAndRA uses dot-spinners as busy indicators in string fields too;
+        # strip them so they don't pollute sensor history.
+        for field in ("sensorState", "status", "dockReason"):
+            val = robot.get(field)
+            if isinstance(val, str) and val and set(val.strip()) == {"."} :
+                if field in self.data.get("robot", {}):
+                    robot[field] = self.data["robot"][field]
+                else:
+                    del robot[field]
+        self.data["robot"] = robot
         self._notify_listeners()
 
     def _handle_maps_raw(self, payload: str | bytes) -> None:
