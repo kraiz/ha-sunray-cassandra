@@ -7,9 +7,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.components import mqtt
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import (
     BooleanSelector,
     NumberSelector,
@@ -38,8 +36,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _ha_mqtt_available(hass: HomeAssistant) -> bool:
-    """Return True if the HA MQTT integration is set up."""
-    return mqtt.async_get_mqtt_data(hass) is not None
+    """Return True if the HA MQTT integration is loaded."""
+    return hass.config_entries.async_entries("mqtt") != []
 
 
 class SunrayCassandraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -53,7 +51,7 @@ class SunrayCassandraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Step 1 – choose connection mode."""
         ha_mqtt_ready = _ha_mqtt_available(self.hass)
 
@@ -82,12 +80,11 @@ class SunrayCassandraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_mqtt_broker(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Step 2a – custom MQTT broker details."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Store partial data and continue to server-name step
             self._mqtt_data = user_input
             return await self.async_step_server_name()
 
@@ -115,7 +112,7 @@ class SunrayCassandraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_server_name(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Step 2b / 3 – CaSSAndRA server name + optional HTTP URL."""
         errors: dict[str, str] = {}
 
@@ -124,7 +121,6 @@ class SunrayCassandraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not server_name:
                 errors[CONF_SERVER_NAME] = "empty_server_name"
             else:
-                # Prevent duplicate entries for the same CaSSAndRA server
                 await self.async_set_unique_id(server_name)
                 self._abort_if_unique_id_configured()
 
@@ -170,25 +166,20 @@ class SunrayCassandraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class SunrayCassandraOptionsFlow(config_entries.OptionsFlow):
     """Handle options for the Sunray / CaSSAndRA integration."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialise."""
-        self._config_entry = config_entry
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Manage options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
-
-        current = self._config_entry.data
 
         schema = vol.Schema(
             {
                 vol.Optional(
                     CONF_CASSANDRA_URL,
-                    default=current.get(CONF_CASSANDRA_URL, ""),
+                    default=self.config_entry.data.get(CONF_CASSANDRA_URL, ""),
                 ): TextSelector(TextSelectorConfig(type=TextSelectorType.URL)),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
+
