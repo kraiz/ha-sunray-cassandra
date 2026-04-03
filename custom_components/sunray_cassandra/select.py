@@ -66,6 +66,8 @@ class SunrayCassandraTaskSelect(SelectEntity):
             identifiers={(DOMAIN, coordinator.server_name)},
         )
         self._unsubscribe: callback | None = None
+        # Explicit choice made by the user in HA; None means "follow server state"
+        self._user_selection: str | None = None
 
         # Initialise from whatever the coordinator already has
         self._update_options_and_current()
@@ -101,12 +103,25 @@ class SunrayCassandraTaskSelect(SelectEntity):
         # Always put TASK_ALL first so the user can un-select any specific task
         self._attr_options = [TASK_ALL] + sorted(available)
 
-        # Prefer the "selected" list from CaSSAndRA (what the server considers active)
+        # If the user made an explicit pick, keep it — unless the task has
+        # disappeared from the available list (e.g. deleted on the server).
+        if self._user_selection is not None:
+            if self._user_selection in available:
+                self._attr_current_option = self._user_selection
+                return
+            else:
+                # Task no longer exists; clear the user selection
+                self._user_selection = None
+
+        # No user selection: follow what CaSSAndRA reports as selected,
+        # or fall back to TASK_ALL when nothing is selected server-side.
+        loaded: list[str] = tasks.get("loaded", [])
         selected: list[str] = tasks.get("selected", [])
-        if selected and selected[0] in available:
-            self._attr_current_option = selected[0]
-        else:
-            self._attr_current_option = TASK_ALL
+        for candidate in (loaded + selected):
+            if candidate in available:
+                self._attr_current_option = candidate
+                return
+        self._attr_current_option = TASK_ALL
 
     # ------------------------------------------------------------------
     # User interaction
@@ -115,7 +130,7 @@ class SunrayCassandraTaskSelect(SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Called when the user picks an option in the HA UI."""
         if option == TASK_ALL:
-            # Nothing to tell CaSSAndRA — just reflect locally
+            self._user_selection = None
             self._attr_current_option = TASK_ALL
             self.async_write_ha_state()
             return
@@ -125,13 +140,14 @@ class SunrayCassandraTaskSelect(SelectEntity):
             return
 
         _LOGGER.debug("Selecting CaSSAndRA task: %s", option)
+        # Remember the user's choice so MQTT echoes don't overwrite it
+        self._user_selection = option
+        self._attr_current_option = option
+        self.async_write_ha_state()
         # Tell CaSSAndRA to mark this task as selected (does not start mowing)
         await self._coordinator.async_publish_command(
             {"tasks": {"command": "select", "value": [option]}}
         )
-        # Optimistically update local state; the MQTT echo will confirm it
-        self._attr_current_option = option
-        self.async_write_ha_state()
 
     # ------------------------------------------------------------------
     # Property read by lawn_mower.py
