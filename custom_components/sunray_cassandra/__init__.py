@@ -96,9 +96,19 @@ def _register_services(hass: HomeAssistant) -> None:
         coord = _get_coordinator_for_call(hass, call)
         if coord:
             task = call.data.get(ATTR_TASK, "all")
-            await coord.async_publish_command(
-                {"robot": {"command": "mow", "value": [task]}}
-            )
+            if task not in ("all", "resume"):
+                # Named task: first select it on CaSSAndRA, then start mowing.
+                # The mow value must be the literal string "task" (not the task name).
+                await coord.async_publish_command(
+                    {"tasks": {"command": "select", "value": [task]}}
+                )
+                await coord.async_publish_command(
+                    {"robot": {"command": "mow", "value": ["task"]}}
+                )
+            else:
+                await coord.async_publish_command(
+                    {"robot": {"command": "mow", "value": [task]}}
+                )
 
     async def _handle_go_to(call: ServiceCall) -> None:
         coord = _get_coordinator_for_call(hass, call)
