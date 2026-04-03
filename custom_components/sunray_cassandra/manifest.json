@@ -1,0 +1,14 @@
+{
+  "domain": "sunray_cassandra",
+  "name": "Sunray / CaSSAndRA Lawn Mower",
+  "version": "0.1.0",
+  "config_flow": true,
+  "documentation": "https://github.com/EinEinfach/CaSSAndRA",
+  "issue_tracker": "https://github.com/ha-sunray-cassandra/issues",
+  "dependencies": [],
+  "after_dependencies": ["mqtt"],
+  "codeowners": [],
+  "requirements": [],
+  "iot_class": "local_push",
+  "homeassistant": "2024.1.0"
+}

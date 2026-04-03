@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sunray / CaSSAndRA",
+        "description": "Verbindet Home Assistant mit einem CaSSAndRA-Mähroboter-Controller über MQTT.\n\n{ha_mqtt_note}",
+        "data": {
+          "use_ha_mqtt": "Home Assistant MQTT-Integration verwenden"
+        }
+      },
+      "mqtt_broker": {
+        "title": "MQTT-Broker",
+        "description": "Gib die Verbindungsdaten für den MQTT-Broker ein, den CaSSAndRA verwendet.",
+        "data": {
+          "mqtt_broker": "Broker-Hostname oder IP",
+          "mqtt_port": "Port",
+          "mqtt_username": "Benutzername (optional)",
+          "mqtt_password": "Passwort (optional)"
+        }
+      },
+      "server_name": {
+        "title": "CaSSAndRA-Servername",
+        "description": "Gib den CaSSAndRA-Servernamen ein (MQTT-Topic-Präfix). Standard ist `myCaSSAndRA`.\n\nOptional kann die CaSSAndRA-Web-URL für den HTTP-Fallback und den Geräte-Konfigurationslink angegeben werden.",
+        "data": {
+          "server_name": "CaSSAndRA-Servername",
+          "cassandra_url": "CaSSAndRA-Web-URL (optional)"
+        }
+      }
+    },
+    "error": {
+      "empty_server_name": "Der Servername darf nicht leer sein.",
+      "already_configured": "Dieser CaSSAndRA-Server ist bereits konfiguriert."
+    },
+    "abort": {
+      "already_configured": "Dieser CaSSAndRA-Server ist bereits konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Optionen",
+        "data": {
+          "cassandra_url": "CaSSAndRA-Web-URL (optional, wird als HTTP-Fallback verwendet)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery_soc": {"name": "Akkustand"},
+      "battery_voltage": {"name": "Akkuspannung"},
+      "battery_current": {"name": "Akkustrom"},
+      "current_task": {"name": "Aktuelle Aufgabe"},
+      "sensor_state": {"name": "Sensorzustand"},
+      "dock_reason": {"name": "Andockgrund"},
+      "gps_quality": {"name": "GPS-Qualität"},
+      "gps_satellites": {"name": "GPS-Satelliten"},
+      "mow_progress": {"name": "Mähfortschritt"},
+      "speed": {"name": "Geschwindigkeit"},
+      "average_speed": {"name": "Durchschnittsgeschwindigkeit"},
+      "position_x": {"name": "Position X"},
+      "position_y": {"name": "Position Y"},
+      "server_version": {"name": "Serverversion"},
+      "server_cpu_load": {"name": "Server-CPU-Auslastung"},
+      "server_cpu_temp": {"name": "Server-CPU-Temperatur"},
+      "server_mem_usage": {"name": "Server-Speicherauslastung"},
+      "server_hdd_usage": {"name": "Server-Festplattenauslastung"},
+      "api_status": {"name": "API-Status"}
+    },
+    "switch": {
+      "schedule": {"name": "Zeitplan"}
+    },
+    "select": {
+      "task_select": {"name": "Aufgabe"}
+    }
+  }
+}

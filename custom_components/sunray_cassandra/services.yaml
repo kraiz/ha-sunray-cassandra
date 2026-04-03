@@ -1,0 +1,95 @@
+mow_task:
+  name: Mow Task
+  description: >
+    Start mowing a specific task by name. Use "all" to mow the entire area or
+    "resume" to continue a previous task. The task must already exist on the
+    CaSSAndRA server. Tip: you can also pick a task via the Task select entity
+    and then press Start on the mower card — this service is for automation use.
+  target:
+    entity:
+      domain: lawn_mower
+      integration: sunray_cassandra
+  fields:
+    task:
+      name: Task name
+      description: >
+        Name of the saved task to execute (e.g. "MyLawn"), "all" to mow the
+        entire perimeter, or "resume" to continue a previous task.
+      required: false
+      default: "all"
+      selector:
+        text:
+
+go_to:
+  name: Go To Position
+  description: Navigate the mower to a specific X/Y coordinate (in map metres).
+  target:
+    entity:
+      domain: lawn_mower
+      integration: sunray_cassandra
+  fields:
+    x:
+      name: X coordinate
+      description: Target X position in metres (relative to map origin).
+      required: true
+      selector:
+        number:
+          min: -1000
+          max: 1000
+          step: 0.01
+          mode: box
+          unit_of_measurement: m
+    y:
+      name: Y coordinate
+      description: Target Y position in metres (relative to map origin).
+      required: true
+      selector:
+        number:
+          min: -1000
+          max: 1000
+          step: 0.01
+          mode: box
+          unit_of_measurement: m
+
+reboot:
+  name: Reboot Mower
+  description: Reboot the Sunray firmware on the mower.
+  target:
+    entity:
+      domain: lawn_mower
+      integration: sunray_cassandra
+
+reboot_gps:
+  name: Reboot GPS
+  description: Reboot the GPS module on the mower.
+  target:
+    entity:
+      domain: lawn_mower
+      integration: sunray_cassandra
+
+set_mow_speed:
+  name: Set Mow Speed
+  description: Set the mowing speed set-point (0.0 – 1.0).
+  target:
+    entity:
+      domain: lawn_mower
+      integration: sunray_cassandra
+  fields:
+    speed:
+      name: Speed
+      description: Mowing speed set-point between 0.0 (slow) and 1.0 (fast).
+      required: true
+      selector:
+        number:
+          min: 0.0
+          max: 1.0
+          step: 0.05
+          mode: slider
+
+toggle_mow_motor:
+  name: Toggle Mow Motor
+  description: Toggle the mow blade motor on or off without changing navigation.
+  target:
+    entity:
+      domain: lawn_mower
+      integration: sunray_cassandra

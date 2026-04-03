@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sunray / CaSSAndRA",
+        "description": "Connect Home Assistant to a CaSSAndRA lawn mower controller via MQTT.\n\n{ha_mqtt_note}",
+        "data": {
+          "use_ha_mqtt": "Use the Home Assistant MQTT integration"
+        }
+      },
+      "mqtt_broker": {
+        "title": "MQTT Broker",
+        "description": "Enter details for the MQTT broker that CaSSAndRA publishes to.",
+        "data": {
+          "mqtt_broker": "Broker hostname or IP",
+          "mqtt_port": "Port",
+          "mqtt_username": "Username (optional)",
+          "mqtt_password": "Password (optional)"
+        }
+      },
+      "server_name": {
+        "title": "CaSSAndRA Server Name",
+        "description": "Enter the CaSSAndRA server name (MQTT topic prefix). Default is `myCaSSAndRA`.\n\nOptionally provide the CaSSAndRA web URL for the HTTP fallback and device configuration link.",
+        "data": {
+          "server_name": "CaSSAndRA server name",
+          "cassandra_url": "CaSSAndRA web URL (optional)"
+        }
+      }
+    },
+    "error": {
+      "empty_server_name": "Server name cannot be empty.",
+      "already_configured": "This CaSSAndRA server is already configured."
+    },
+    "abort": {
+      "already_configured": "This CaSSAndRA server is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "cassandra_url": "CaSSAndRA web URL (optional, used as HTTP fallback)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery_soc": {"name": "Battery"},
+      "battery_voltage": {"name": "Battery Voltage"},
+      "battery_current": {"name": "Battery Current"},
+      "current_task": {"name": "Current Task"},
+      "sensor_state": {"name": "Sensor State"},
+      "dock_reason": {"name": "Dock Reason"},
+      "gps_quality": {"name": "GPS Quality"},
+      "gps_satellites": {"name": "GPS Satellites"},
+      "mow_progress": {"name": "Mow Progress"},
+      "speed": {"name": "Speed"},
+      "average_speed": {"name": "Average Speed"},
+      "position_x": {"name": "Position X"},
+      "position_y": {"name": "Position Y"},
+      "server_version": {"name": "Server Version"},
+      "server_cpu_load": {"name": "Server CPU Load"},
+      "server_cpu_temp": {"name": "Server CPU Temperature"},
+      "server_mem_usage": {"name": "Server Memory Usage"},
+      "server_hdd_usage": {"name": "Server Disk Usage"},
+      "api_status": {"name": "API Status"}
+    },
+    "switch": {
+      "schedule": {"name": "Schedule"}
+    },
+    "select": {
+      "task_select": {"name": "Task"}
+    }
+  }
+}
