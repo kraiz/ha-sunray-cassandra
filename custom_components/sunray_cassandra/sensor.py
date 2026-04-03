@@ -78,13 +78,11 @@ def _server(key: str, fallback: Any = None):
 
 
 def _mow_progress(robot: dict, data: dict) -> float | None:
-    raw = robot.get("mowPointIdx")
-    # CaSSAndRA also exposes a calculated mowprogress field (0.0 – 1.0)
-    # If direct progress field available, prefer it
-    if "mowprogress" in robot:
-        val = robot["mowprogress"]
-        if val is not None:
-            return round(float(val) * 100, 1)
+    # CaSSAndRA publishes mow progress on the `map` topic (not `robot`).
+    # `mowprogressIdxPercent` is an integer 0-100 based on mow point index.
+    val = data.get("map", {}).get("mowprogressIdxPercent")
+    if val is not None:
+        return round(float(val), 1)
     return None
 
 
@@ -124,7 +122,13 @@ SENSOR_DESCRIPTIONS: tuple[SunraySensorEntityDescription, ...] = (
         key="current_task",
         name="Current Task",
         icon="mdi:map-check-outline",
-        value_fn=lambda robot, data: (data.get("tasks", {}).get("loaded") or [None])[0],
+        # `loaded` is set by CaSSAndRA only while actively mowing a task;
+        # fall back to `selected[0]` so the sensor shows the queued task name
+        # even before mowing has started.
+        value_fn=lambda robot, data: (
+            (data.get("tasks", {}).get("loaded") or [None])[0]
+            or (data.get("tasks", {}).get("selected") or [None])[0]
+        ),
     ),
     # ---- Error / sensor state -------------------------------------------
     SunraySensorEntityDescription(

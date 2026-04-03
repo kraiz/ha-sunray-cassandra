@@ -20,6 +20,7 @@ DEFAULT_CASSANDRA_PORT = 8050
 # MQTT topic templates  (format with server_name)
 TOPIC_STATUS = "{server_name}/status"
 TOPIC_ROBOT = "{server_name}/robot"
+TOPIC_MAP = "{server_name}/map"
 TOPIC_MAPS = "{server_name}/maps"
 TOPIC_TASKS = "{server_name}/tasks"
 TOPIC_MOW_PARAMETERS = "{server_name}/mowParameters"

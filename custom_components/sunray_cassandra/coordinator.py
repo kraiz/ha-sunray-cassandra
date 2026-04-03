@@ -38,6 +38,7 @@ from .const import (
     DOMAIN,
     ROBOT_STATUS_OFFLINE,
     TOPIC_CMD,
+    TOPIC_MAP,
     TOPIC_MAPS,
     TOPIC_MOW_PARAMETERS,
     TOPIC_ROBOT,
@@ -69,6 +70,7 @@ class SunrayCassandraCoordinator:
         self.data: dict[str, Any] = {
             "api_status": API_STATUS_OFFLINE,
             "robot": {},
+            "map": {},
             "maps": {},
             "tasks": {},
             "mow_parameters": {},
@@ -151,6 +153,7 @@ class SunrayCassandraCoordinator:
         topics = {
             TOPIC_STATUS: self._handle_status,
             TOPIC_ROBOT: self._handle_robot,
+            TOPIC_MAP: self._handle_map,
             TOPIC_MAPS: self._handle_maps,
             TOPIC_TASKS: self._handle_tasks,
             TOPIC_MOW_PARAMETERS: self._handle_mow_parameters,
@@ -191,6 +194,7 @@ class SunrayCassandraCoordinator:
         topic_map = {
             TOPIC_STATUS.format(server_name=self._server_name): self._handle_status_raw,
             TOPIC_ROBOT.format(server_name=self._server_name): self._handle_robot_raw,
+            TOPIC_MAP.format(server_name=self._server_name): self._handle_map_raw,
             TOPIC_MAPS.format(server_name=self._server_name): self._handle_maps_raw,
             TOPIC_TASKS.format(server_name=self._server_name): self._handle_tasks_raw,
             TOPIC_MOW_PARAMETERS.format(server_name=self._server_name): self._handle_mow_parameters_raw,
@@ -233,6 +237,10 @@ class SunrayCassandraCoordinator:
     @callback
     def _handle_robot(self, msg: Any) -> None:
         self._handle_robot_raw(msg.payload)
+
+    @callback
+    def _handle_map(self, msg: Any) -> None:
+        self._handle_map_raw(msg.payload)
 
     @callback
     def _handle_maps(self, msg: Any) -> None:
@@ -282,6 +290,11 @@ class SunrayCassandraCoordinator:
                 else:
                     robot.pop(field, None)
         self.data["robot"] = robot
+        self._notify_listeners()
+
+    def _handle_map_raw(self, payload: str | bytes) -> None:
+        self._last_mqtt_message = datetime.utcnow()
+        self.data["map"] = self._parse_json(payload, "map")
         self._notify_listeners()
 
     def _handle_maps_raw(self, payload: str | bytes) -> None:
