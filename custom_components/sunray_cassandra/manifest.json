@@ -1,7 +1,7 @@
 {
   "domain": "sunray_cassandra",
   "name": "Sunray / CaSSAndRA Lawn Mower",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "config_flow": true,
   "documentation": "https://github.com/EinEinfach/CaSSAndRA",
   "issue_tracker": "https://github.com/ha-sunray-cassandra/issues",
