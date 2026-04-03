@@ -32,18 +32,22 @@ from .const import (
     CONF_MQTT_PASSWORD,
     CONF_MQTT_PORT,
     CONF_MQTT_USERNAME,
+    CONF_ORIGIN_LAT,
+    CONF_ORIGIN_LON,
     CONF_SERVER_NAME,
     CONF_USE_HA_MQTT,
     DEFAULT_MQTT_PORT,
     DOMAIN,
     ROBOT_STATUS_OFFLINE,
     TOPIC_CMD,
+    TOPIC_COORDS,
     TOPIC_MAP,
     TOPIC_MAPS,
     TOPIC_MOW_PARAMETERS,
     TOPIC_ROBOT,
     TOPIC_SCHEDULE,
     TOPIC_SERVER,
+    TOPIC_SETTINGS,
     TOPIC_STATUS,
     TOPIC_TASKS,
 )
@@ -54,6 +58,8 @@ _LOGGER = logging.getLogger(__name__)
 STALE_TIMEOUT = timedelta(seconds=30)
 # Interval for the HTTP polling fallback
 HTTP_POLL_INTERVAL = timedelta(seconds=15)
+# How often to refresh the mow-path coordinate data from CaSSAndRA
+COORDS_REFRESH_INTERVAL = timedelta(seconds=30)
 
 
 class SunrayCassandraCoordinator:
@@ -76,11 +82,18 @@ class SunrayCassandraCoordinator:
             "mow_parameters": {},
             "server": {},
             "schedule": {},
+            "coords": {},   # GeoJSON FeatureCollections keyed by layer name
+            "settings": {}, # CaSSAndRA settings (includes origin lat/lon)
         }
+
+        # GPS origin – populated from config entry data or from MQTT settings response
+        self.origin_lat: float = entry.data.get(CONF_ORIGIN_LAT, 0.0)
+        self.origin_lon: float = entry.data.get(CONF_ORIGIN_LON, 0.0)
 
         self._listeners: list[callback] = []
         self._unsubscribe_mqtt: list[Any] = []
         self._unsub_poll: Any = None
+        self._unsub_coords_poll: Any = None
         self._last_mqtt_message: datetime | None = None
 
         # External MQTT client (non-HA MQTT integration path)
@@ -119,6 +132,18 @@ class SunrayCassandraCoordinator:
         else:
             await self._connect_external_mqtt()
 
+        # Request the CaSSAndRA settings once on startup so we can get the GPS origin
+        await self._async_request_settings()
+
+        # Periodically refresh the coordinate/map GeoJSON data
+        self._unsub_coords_poll = async_track_time_interval(
+            self.hass,
+            self._async_request_coords,
+            COORDS_REFRESH_INTERVAL,
+        )
+        # Also request an initial set of coords shortly after setup
+        self.hass.async_create_task(self._async_request_coords())
+
         # Start the periodic HTTP fallback poll (only acts if MQTT is stale)
         if self._cassandra_url:
             self._unsub_poll = async_track_time_interval(
@@ -136,6 +161,10 @@ class SunrayCassandraCoordinator:
         if self._unsub_poll:
             self._unsub_poll()
             self._unsub_poll = None
+
+        if self._unsub_coords_poll:
+            self._unsub_coords_poll()
+            self._unsub_coords_poll = None
 
         if self._ext_mqtt_client:
             try:
@@ -159,6 +188,8 @@ class SunrayCassandraCoordinator:
             TOPIC_MOW_PARAMETERS: self._handle_mow_parameters,
             TOPIC_SERVER: self._handle_server,
             TOPIC_SCHEDULE: self._handle_schedule,
+            TOPIC_COORDS: self._handle_coords,
+            TOPIC_SETTINGS: self._handle_settings,
         }
         for topic_template, handler in topics.items():
             topic = topic_template.format(server_name=self._server_name)
@@ -200,6 +231,8 @@ class SunrayCassandraCoordinator:
             TOPIC_MOW_PARAMETERS.format(server_name=self._server_name): self._handle_mow_parameters_raw,
             TOPIC_SERVER.format(server_name=self._server_name): self._handle_server_raw,
             TOPIC_SCHEDULE.format(server_name=self._server_name): self._handle_schedule_raw,
+            TOPIC_COORDS.format(server_name=self._server_name): self._handle_coords_raw,
+            TOPIC_SETTINGS.format(server_name=self._server_name): self._handle_settings_raw,
         }
 
         def on_connect(client, userdata, flags, rc):
@@ -262,6 +295,14 @@ class SunrayCassandraCoordinator:
     def _handle_schedule(self, msg: Any) -> None:
         self._handle_schedule_raw(msg.payload)
 
+    @callback
+    def _handle_coords(self, msg: Any) -> None:
+        self._handle_coords_raw(msg.payload)
+
+    @callback
+    def _handle_settings(self, msg: Any) -> None:
+        self._handle_settings_raw(msg.payload)
+
     # ------------------------------------------------------------------
     # Raw payload handlers (accept str or bytes)
     # ------------------------------------------------------------------
@@ -321,6 +362,96 @@ class SunrayCassandraCoordinator:
         self._last_mqtt_message = datetime.utcnow()
         self.data["schedule"] = self._parse_json(payload, "schedule")
         self._notify_listeners()
+
+    def _handle_coords_raw(self, payload: str | bytes) -> None:
+        """Handle a GeoJSON FeatureCollection published on the coords topic.
+
+        CaSSAndRA publishes one message per requested layer (currentMap, mowPath,
+        obstacles, preview).  Each message is a GeoJSON FeatureCollection whose
+        features carry a "name" property identifying the layer.  We accumulate
+        them all under self.data["coords"] keyed by that layer name.
+        """
+        self._last_mqtt_message = datetime.utcnow()
+        geojson = self._parse_json(payload, "coords")
+        if not geojson:
+            return
+        # Determine which layer this payload belongs to by inspecting feature names
+        layer_name: str | None = None
+        for feature in geojson.get("features", []):
+            name = feature.get("properties", {}).get("name", "")
+            if name:
+                layer_name = name
+                break
+        if layer_name is None:
+            # Fallback: store the whole payload under a generic key
+            layer_name = "unknown"
+        self.data["coords"][layer_name] = geojson
+        self._notify_listeners()
+
+    def _handle_settings_raw(self, payload: str | bytes) -> None:
+        """Handle the settings payload published by CaSSAndRA.
+
+        The payload contains rover config including GPS origin fields:
+          "latitude"   → rovercfg.lat
+          "longtitude" → rovercfg.lon  (note: typo in CaSSAndRA source)
+        """
+        self._last_mqtt_message = datetime.utcnow()
+        settings = self._parse_json(payload, "settings")
+        if not settings:
+            return
+        self.data["settings"] = settings
+        # Extract GPS origin and cache on the coordinator instance
+        lat = settings.get("latitude")
+        lon = settings.get("longtitude")  # CaSSAndRA typo
+        if lat is not None and lon is not None:
+            try:
+                new_lat = float(lat)
+                new_lon = float(lon)
+                if new_lat != self.origin_lat or new_lon != self.origin_lon:
+                    self.origin_lat = new_lat
+                    self.origin_lon = new_lon
+                    _LOGGER.debug(
+                        "GPS origin updated: lat=%s lon=%s", self.origin_lat, self.origin_lon
+                    )
+                    # Persist to the config entry so it survives HA restart
+                    self.hass.config_entries.async_update_entry(
+                        self.entry,
+                        data={
+                            **self.entry.data,
+                            CONF_ORIGIN_LAT: self.origin_lat,
+                            CONF_ORIGIN_LON: self.origin_lon,
+                        },
+                    )
+            except (TypeError, ValueError):
+                _LOGGER.warning("Could not parse GPS origin from settings: lat=%s lon=%s", lat, lon)
+        self._notify_listeners()
+
+    # ------------------------------------------------------------------
+    # CaSSAndRA request helpers (MQTT request/response)
+    # ------------------------------------------------------------------
+
+    async def _async_request_settings(self) -> None:
+        """Ask CaSSAndRA to publish its current settings (includes GPS origin)."""
+        try:
+            await self.async_publish_command({"settings": {"command": "update"}})
+            _LOGGER.debug("Requested CaSSAndRA settings for server '%s'", self._server_name)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.debug("Could not request CaSSAndRA settings: %s", exc)
+
+    async def _async_request_coords(self, _now: Any = None) -> None:
+        """Ask CaSSAndRA to publish the current map GeoJSON coordinate data."""
+        try:
+            await self.async_publish_command(
+                {
+                    "coords": {
+                        "command": "update",
+                        "value": ["currentMap", "mowPath", "obstacles"],
+                    }
+                }
+            )
+            _LOGGER.debug("Requested CaSSAndRA coords for server '%s'", self._server_name)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.debug("Could not request CaSSAndRA coords: %s", exc)
 
     # ------------------------------------------------------------------
     # HTTP fallback polling

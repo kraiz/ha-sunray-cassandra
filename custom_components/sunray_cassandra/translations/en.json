@@ -65,7 +65,8 @@
       "server_cpu_temp": {"name": "Server CPU Temperature"},
       "server_mem_usage": {"name": "Server Memory Usage"},
       "server_hdd_usage": {"name": "Server Disk Usage"},
-      "api_status": {"name": "API Status"}
+      "api_status": {"name": "API Status"},
+      "map_data": {"name": "Map Data"}
     },
     "switch": {
       "schedule": {"name": "Schedule"}

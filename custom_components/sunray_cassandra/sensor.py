@@ -280,10 +280,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up sensor entities."""
     coordinator: SunrayCassandraCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
-    async_add_entities(
+    entities: list = [
         SunrayCassandraSensor(coordinator, description)
         for description in SENSOR_DESCRIPTIONS
-    )
+    ]
+    entities.append(MapDataSensor(coordinator))
+    async_add_entities(entities)
 
 
 class SunrayCassandraSensor(SensorEntity):
@@ -332,3 +334,75 @@ class SunrayCassandraSensor(SensorEntity):
                 exc_info=True,
             )
             return None
+
+
+class MapDataSensor(SensorEntity):
+    """Sensor that exposes the live GeoJSON map data and GPS origin as attributes.
+
+    The native value is the current mow-progress percentage (same as the
+    mow_progress sensor) so the entity has a meaningful "state".  The real
+    payload for the Lovelace map card is in extra_state_attributes.
+
+    This entity is disabled by default — users opt in by enabling it in the
+    entity registry.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Map Data"
+    _attr_icon = "mdi:map"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: SunrayCassandraCoordinator) -> None:
+        self._coordinator = coordinator
+        self._attr_unique_id = f"{coordinator.server_name}_map_data"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, coordinator.server_name)},
+        )
+        self._unsubscribe: callback | None = None
+
+    async def async_added_to_hass(self) -> None:
+        self._unsubscribe = self._coordinator.async_add_listener(self._handle_update)
+        self._handle_update()
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsubscribe:
+            self._unsubscribe()
+
+    @callback
+    def _handle_update(self) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> float | None:
+        """Return mow progress % as the entity state."""
+        val = self._coordinator.data.get("map", {}).get("mowprogressIdxPercent")
+        if val is not None:
+            try:
+                return round(float(val), 1)
+            except (TypeError, ValueError):
+                pass
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose GeoJSON layers and GPS origin for the Lovelace map card."""
+        coords = self._coordinator.data.get("coords", {})
+        map_meta = self._coordinator.data.get("map", {})
+        return {
+            # GPS origin (WGS-84 decimal degrees)
+            "origin_lat": self._coordinator.origin_lat,
+            "origin_lon": self._coordinator.origin_lon,
+            # Individual GeoJSON FeatureCollections keyed by layer name
+            # e.g. "currentMap", "mowPath", "obstacles"
+            "geojson_layers": coords,
+            # Mow progress metadata so the card can split the path
+            "finished_idx": map_meta.get("finishedIdx"),
+            "idx_total": map_meta.get("idxTotal"),
+            "mow_progress_pct": map_meta.get("mowprogressIdxPercent"),
+            # Live rover position (local metres, relative to GPS origin)
+            "position_x": self._coordinator.robot.get("position", {}).get("x"),
+            "position_y": self._coordinator.robot.get("position", {}).get("y"),
+        }

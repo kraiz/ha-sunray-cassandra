@@ -11,6 +11,8 @@ CONF_MQTT_USERNAME = "mqtt_username"
 CONF_MQTT_PASSWORD = "mqtt_password"
 CONF_USE_HA_MQTT = "use_ha_mqtt"
 CONF_CASSANDRA_URL = "cassandra_url"
+CONF_ORIGIN_LAT = "origin_lat"
+CONF_ORIGIN_LON = "origin_lon"
 
 # Defaults
 DEFAULT_MQTT_PORT = 1883
@@ -27,6 +29,8 @@ TOPIC_MOW_PARAMETERS = "{server_name}/mowParameters"
 TOPIC_SERVER = "{server_name}/server"
 TOPIC_SCHEDULE = "{server_name}/schedule"
 TOPIC_CMD = "{server_name}/api_cmd"
+TOPIC_COORDS = "{server_name}/coords"
+TOPIC_SETTINGS = "{server_name}/settings"
 
 # CaSSAndRA API server status values
 API_STATUS_BOOT = "boot"

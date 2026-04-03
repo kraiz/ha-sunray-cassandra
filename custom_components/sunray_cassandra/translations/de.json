@@ -65,7 +65,8 @@
       "server_cpu_temp": {"name": "Server-CPU-Temperatur"},
       "server_mem_usage": {"name": "Server-Speicherauslastung"},
       "server_hdd_usage": {"name": "Server-Festplattenauslastung"},
-      "api_status": {"name": "API-Status"}
+      "api_status": {"name": "API-Status"},
+      "map_data": {"name": "Kartendaten"}
     },
     "switch": {
       "schedule": {"name": "Zeitplan"}
