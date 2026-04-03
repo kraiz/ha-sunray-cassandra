@@ -261,7 +261,11 @@ class SunrayCassandraCoordinator:
     def _handle_status_raw(self, payload: str | bytes) -> None:
         self._last_mqtt_message = datetime.utcnow()
         status = payload if isinstance(payload, str) else payload.decode("utf-8", errors="replace")
-        self.data["api_status"] = status.strip()
+        status = status.strip()
+        # CaSSAndRA sends ".", "..", "..." as busy-spinners — ignore them
+        if set(status) == {"."} :
+            return
+        self.data["api_status"] = status
         self._notify_listeners()
 
     def _handle_robot_raw(self, payload: str | bytes) -> None:
